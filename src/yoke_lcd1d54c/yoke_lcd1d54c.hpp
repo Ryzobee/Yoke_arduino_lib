@@ -6,6 +6,7 @@
 
 #include "../ryzobee_yoke.hpp"
 #include "Touch_CST816T.hpp"
+#include "Panel_ST7789V_BOE154.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -30,11 +31,21 @@ struct Lcd1d54cPins {
     int touch_int = -1;
 };
 
-class Yoke_lcd1d54c : public lgfx::LGFX_Device {
+class Yoke_lcd1d54c : public lgfx::LGFX_Device, public ryzobee_yoke {
 public:
     Yoke_lcd1d54c(TwoWire* wire = nullptr, SemaphoreHandle_t* mutex = nullptr)
-        : _dev_i2c(wire == nullptr ? &Wire : wire), _i2c_mutex(mutex) {
+        : ryzobee_yoke(kRYZOBEE_YOKE_F_BUS), _dev_i2c(wire == nullptr ? &Wire : wire), _i2c_mutex(mutex) {
         configure();
+    }
+
+    /**
+     * @brief Initialize the LCD using the standard F_BUS connector wiring.
+     *
+     * @param iodata F_BUS description ordered by physical pins 9 through 24.
+     * @return YOKE_PORT_ERROR_NONE on success, otherwise a port error code.
+     */
+    int begin(std::vector<uint8_t>* iodata) {
+        return ryzobee_yoke::begin(iodata);
     }
 
     /**
@@ -53,6 +64,7 @@ public:
         _pins = pins;
         configure();
         if (!init()) {
+            setBrightness(0);
             releaseBus();
             return YOKE_PORT_ERROR_NOT_AVAILABLE;
         }
@@ -71,6 +83,10 @@ public:
         setBrightness(0);
         releaseBus();
         _initialized = false;
+        if (_iodata != nullptr) {
+            _iodata->at(YOKE_PORT_USED) = 0;
+            _iodata = nullptr;
+        }
         return YOKE_PORT_ERROR_NONE;
     }
 
@@ -141,7 +157,49 @@ public:
         return touched;
     }
 
+protected:
+    int portBegin(std::vector<uint8_t>* iodata) override {
+        Lcd1d54cPins pins;
+        pins.sclk = getFBusPin(iodata, LCD_SCK_F_BUS_PIN);
+        pins.rst = getFBusPin(iodata, LCD_RST_F_BUS_PIN);
+        pins.mosi = getFBusPin(iodata, LCD_MOSI_F_BUS_PIN);
+        pins.bl = getFBusPin(iodata, LCD_BL_F_BUS_PIN);
+        pins.cs = getFBusPin(iodata, LCD_CS_F_BUS_PIN);
+        pins.dc = getFBusPin(iodata, LCD_DC_F_BUS_PIN);
+        pins.touch_rst = getFBusPin(iodata, TP_RST_F_BUS_PIN);
+        pins.touch_int = getFBusPin(iodata, TP_INT_F_BUS_PIN);
+        pins.touch_sda = getFBusPin(iodata, TP_SDA_F_BUS_PIN);
+        pins.touch_scl = getFBusPin(iodata, TP_SCL_F_BUS_PIN);
+        return begin(pins);
+    }
+
+    int portEnd() override {
+        setBrightness(0);
+        releaseBus();
+        _initialized = false;
+        return YOKE_PORT_ERROR_NONE;
+    }
+
 private:
+    // Physical connector positions, independent of the board GPIO mapping.
+    enum : uint8_t {
+        F_BUS_FIRST_PIN = 9,
+        LCD_SCK_F_BUS_PIN = 11,
+        LCD_RST_F_BUS_PIN = 13,
+        LCD_MOSI_F_BUS_PIN = 14,
+        LCD_BL_F_BUS_PIN = 16,
+        LCD_CS_F_BUS_PIN = 18,
+        LCD_DC_F_BUS_PIN = 20,
+        TP_RST_F_BUS_PIN = 21,
+        TP_INT_F_BUS_PIN = 22,
+        TP_SDA_F_BUS_PIN = 23,
+        TP_SCL_F_BUS_PIN = 24,
+    };
+
+    static int getFBusPin(const std::vector<uint8_t>* iodata, uint8_t pin) {
+        return iodata->at(YOKE_PORT_PIN_START + pin - F_BUS_FIRST_PIN);
+    }
+
     /**
      * @brief Check GPIO capabilities and duplicate assignments before accessing hardware.
      *
@@ -206,7 +264,7 @@ private:
             cfg.dummy_read_bits = 1;
             cfg.readable = true;
             cfg.invert = true;
-            cfg.rgb_order = false;
+            cfg.rgb_order = true;
             cfg.dlen_16bit = false;
             cfg.bus_shared = true;
 
@@ -250,12 +308,11 @@ private:
         setPanel(&_panel_instance);
     }
 
-    lgfx::Panel_ST7789 _panel_instance;
+    yoke_detail::Panel_ST7789V_BOE154 _panel_instance;
     lgfx::Bus_SPI _bus_instance;
     lgfx::Light_PWM _light_instance;
     lgfx::Touch_CST816T _touch_instance;
     TwoWire* _dev_i2c = nullptr;
     SemaphoreHandle_t* _i2c_mutex = nullptr;
     Lcd1d54cPins _pins;
-    bool _initialized = false;
 };

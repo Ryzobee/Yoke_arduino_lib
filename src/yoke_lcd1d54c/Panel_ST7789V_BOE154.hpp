@@ -1,0 +1,43 @@
+#pragma once
+
+#include <LovyanGFX.hpp>
+
+namespace yoke_detail {
+
+class Panel_ST7789V_BOE154 : public lgfx::Panel_ST7789 {
+protected:
+    /**
+     * @brief Provide the BOE 1.54-inch IPS panel initialization sequence.
+     *
+     * @param listno Command list index; only list 0 is defined.
+     * @return Command list, or nullptr when no further list exists.
+     */
+    const uint8_t* getInitCommands(uint8_t listno) const override {
+        static constexpr uint8_t commands[] = {
+            0x11, CMD_INIT_DELAY, 120,  // Exit sleep, then wait 120 ms.
+            0x36, 1, 0x00,
+            0x3A, 1, 0x05,
+            0x21, 0,
+            0x2A, 4, 0x00, 0x00, 0x00, 0xEF,
+            0x2B, 4, 0x00, 0x00, 0x00, 0xEF,
+            0xB2, 5, 0x0C, 0x0C, 0x00, 0x33, 0x33,
+            0xB7, 1, 0x35,
+            0xBB, 1, 0x1F,
+            0xC0, 1, 0x2C,
+            0xC2, 1, 0x01,
+            0xC3, 1, 0x12,
+            0xC4, 1, 0x20,
+            0xC6, 1, 0x0F,
+            0xD0, 2, 0xA4, 0xA1,
+            0xE0, 14, 0xD0, 0x08, 0x11, 0x08, 0x0C, 0x15, 0x39,
+                      0x33, 0x50, 0x36, 0x13, 0x14, 0x29, 0x2D,
+            0xE1, 14, 0xD0, 0x08, 0x10, 0x08, 0x06, 0x06, 0x39,
+                      0x44, 0x51, 0x0B, 0x16, 0x14, 0x2F, 0x31,
+            0x29, 0,
+            0xFF, 0xFF,  // End of command list.
+        };
+        return listno == 0 ? commands : nullptr;
+    }
+};
+
+} // namespace yoke_detail

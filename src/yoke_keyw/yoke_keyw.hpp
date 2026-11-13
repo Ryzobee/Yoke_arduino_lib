@@ -16,40 +16,6 @@ public:
     }
 
     /**
-     * @brief Reserve an RS port and initialize its key and LED pins.
-     *
-     * @param iodata Board port data; must remain valid until end().
-     * @return YOKE_PORT_ERROR_NONE on success, otherwise a port error code.
-     */
-    int begin(std::vector<uint8_t>* iodata) {
-        if (_initialized) return YOKE_PORT_ERROR_ALREADY_INITIALIZED;
-        if (iodata == nullptr || iodata->size() < YOKE_PORT_PIN_START + 2) {
-            return YOKE_PORT_ERROR_NOT_CONFIGURED;
-        }
-        if (portInvalid(iodata)) return YOKE_PORT_ERROR_INVALID;
-        int result = portBegin(iodata);
-        if (result == YOKE_PORT_ERROR_NONE) {
-            _iodata = iodata;
-            _iodata->at(YOKE_PORT_USED) = 1;
-        }
-        return result;
-    }
-
-    /**
-     * @brief Turn off the LED, release the pins, and free the RS port.
-     *
-     * @return YOKE_PORT_ERROR_NONE on success, otherwise a port error code.
-     */
-    int end() {
-        int result = portEnd();
-        if (result == YOKE_PORT_ERROR_NONE) {
-            _iodata->at(YOKE_PORT_USED) = 0;
-            _iodata = nullptr;
-        }
-        return result;
-    }
-
-    /**
      * @brief Poll and debounce the active-low key; call frequently from loop().
      */
     void update() {
